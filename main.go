@@ -8,7 +8,7 @@ import (
 	"fyne.io/fyne/layout"
 	"fyne.io/fyne/widget"
 
-	"github.com/termnml/fyne/shutdowntimer/img"
+	"github.com/termnml/shutdowntimer/img"
 )
 
 type counter struct {
