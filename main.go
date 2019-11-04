@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"fyne.io/fyne"
@@ -11,98 +12,66 @@ import (
 	"github.com/termnml/shutdowntimer/img"
 )
 
-type counter struct {
-	out *widget.Label
-	add *widget.Button
-}
-
-func newCounter() *counter {
-	c := &counter{}
-	c.out = widget.NewLabel("0")
-	c.add = widget.NewButton("Add", func() {})
-	return c
-}
-
-func setTime(clockCurrent *widget.Label) {
+func printTime() {
 	timeFormatted := time.Now().Format("15:04:05")
-	clockCurrent.SetText(timeFormatted)
-}
+	wTimeCurrent.SetText(fmt.Sprintf("Uhrzeit:             %s", timeFormatted))
 
-func setTimeLeft(clockLeft *widget.Label) {
 	timeLeftDuration := timeEnd.Sub(time.Now())
-	timeLeftTime := time.Time{}.Add(timeLeftDuration)
-	timeFormatted := timeLeftTime.Format("15:04:05")
-	clockLeft.SetText(timeFormatted)
+	timeLeft := time.Time{}.Add(timeLeftDuration)
+	timeFormatted = timeLeft.Format("15:04:05")
+	wTimeLeft.SetText(fmt.Sprintf("verbleibend:   %s", timeFormatted))
+
+	timeFormatted = timeEnd.Format("15:04:05")
+	wTimeEnd.SetText(fmt.Sprintf("Ende:                 %s", timeFormatted))
 }
 
-func setTimeEnd(clockEnd *widget.Label) {
-	timeFormatted := timeEnd.Format("15:04:05")
-	clockEnd.SetText(timeFormatted)
-}
-
-func addTimeToEnd(addTime time.Duration, valTimeLeft *widget.Label, valTimeShutdown *widget.Label) {
+func addTime(addTime time.Duration) {
 	timeEnd = timeEnd.Add(addTime)
-	setTimeLeft(valTimeLeft)
-	setTimeEnd(valTimeShutdown)
+	printTime()
 }
 
 var timeLeft time.Duration
 var timeEnd time.Time
+var wTimeCurrent, wTimeLeft, wTimeEnd *widget.Label
 
 func main() {
 	app := app.New()
-	w := app.NewWindow("Shutdown Timer")
+	window := app.NewWindow("Shutdown Timer")
 
-	lblTimeCurrent := widget.NewLabelWithStyle("aktuelle Uhrzeit:",
-		fyne.TextAlignLeading, fyne.TextStyle{Bold: true},
-	)
-	lblTimeLeft := widget.NewLabelWithStyle("verbleibende Zeit:",
-		fyne.TextAlignLeading, fyne.TextStyle{Bold: true},
-	)
-	lblTimeShutdown := widget.NewLabelWithStyle("Shutdown Uhrzeit:",
-		fyne.TextAlignLeading, fyne.TextStyle{Bold: true},
-	)
-	valTimeCurrent := widget.NewLabelWithStyle("",
+	wTimeCurrent = widget.NewLabelWithStyle("",
 		fyne.TextAlignTrailing, fyne.TextStyle{Bold: false},
 	)
-	valTimeLeft := widget.NewLabelWithStyle("",
-		fyne.TextAlignTrailing, fyne.TextStyle{Bold: false},
+	wTimeLeft = widget.NewLabelWithStyle("",
+		fyne.TextAlignTrailing, fyne.TextStyle{Bold: true},
 	)
-	valTimeShutdown := widget.NewLabelWithStyle("",
+	wTimeEnd = widget.NewLabelWithStyle("",
 		fyne.TextAlignTrailing, fyne.TextStyle{Bold: false},
 	)
 
-	setTime(valTimeCurrent)
-
-	// dummy
+	// dummyStart
 	timeLeft = 120
 	timeEnd = time.Now().Add(timeLeft * time.Second)
 
-	setTimeEnd(valTimeShutdown)
+	printTime()
 
 	containerTop := fyne.NewContainerWithLayout(layout.NewCenterLayout())
 	containerTop.AddObject(widget.NewHBox(
 		widget.NewVBox(
-			lblTimeCurrent,
-			lblTimeLeft,
-			lblTimeShutdown,
-		),
-		widget.NewVBox(
-			valTimeCurrent,
-			valTimeLeft,
-			valTimeShutdown,
+			wTimeCurrent,
+			wTimeLeft,
+			wTimeEnd,
 		),
 	))
 	containerCenter := fyne.NewContainerWithLayout(layout.NewCenterLayout())
 	containerCenter.AddObject(widget.NewHBox(
 		widget.NewButton("+5 min", func() {
-			addTimeToEnd(5*time.Minute, valTimeLeft, valTimeShutdown)
+			addTime(5 * time.Minute)
 		}),
 		widget.NewButton("+10 min", func() {
-			addTimeToEnd(10*time.Minute, valTimeLeft, valTimeShutdown)
+			addTime(10 * time.Minute)
 		}),
 		widget.NewButton("+30 min", func() {
-			addTimeToEnd(30*time.Minute, valTimeLeft, valTimeShutdown)
+			addTime(30 * time.Minute)
 		}),
 	))
 
@@ -117,20 +86,19 @@ func main() {
 	containerMaster.AddObject(containerBottom)
 	containerMaster.AddObject(containerCenter)
 
-	w.SetContent(containerMaster)
+	window.SetContent(containerMaster)
 
 	// settings for the window
-	w.SetIcon(img.Icon)
-	w.Resize(fyne.NewSize(400, 200))
-	w.CenterOnScreen()
+	window.SetIcon(img.Icon)
+	window.Resize(fyne.NewSize(400, 200))
+	window.CenterOnScreen()
 
 	go func() {
 		t := time.NewTicker(time.Second)
 		for range t.C {
-			setTime(valTimeCurrent)
-			setTimeLeft(valTimeLeft)
+			printTime()
 		}
 	}()
 
-	w.ShowAndRun()
+	window.ShowAndRun()
 }
