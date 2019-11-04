@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os/exec"
+	"runtime"
 	"time"
 
 	"fyne.io/fyne"
@@ -12,27 +15,55 @@ import (
 	"github.com/termnml/shutdowntimer/img"
 )
 
-func printTime() {
-	timeFormatted := time.Now().Format("15:04:05")
+func outputTime() {
+	timeNow := time.Now()
+	timeFormatted := timeNow.Format("15:04:05")
 	wTimeCurrent.SetText(fmt.Sprintf("Uhrzeit:             %s", timeFormatted))
 
-	timeLeftDuration := timeEnd.Sub(time.Now())
-	timeLeft := time.Time{}.Add(timeLeftDuration)
-	timeFormatted = timeLeft.Format("15:04:05")
+	timeLeftT := time.Time{}.Add(timeLeft)
+	timeFormatted = timeLeftT.Format("15:04:05")
 	wTimeLeft.SetText(fmt.Sprintf("verbleibend:   %s", timeFormatted))
 
+	timeEnd := timeNow.Add(timeLeft)
 	timeFormatted = timeEnd.Format("15:04:05")
 	wTimeEnd.SetText(fmt.Sprintf("Ende:                 %s", timeFormatted))
 }
 
-func addTime(addTime time.Duration) {
-	timeEnd = timeEnd.Add(addTime)
-	printTime()
+func addTime(duration time.Duration) {
+	timeLeft += duration
+	outputTime()
+}
+
+func updateTime() {
+	if runs {
+		if timeLeft <= 0 {
+			runs = false
+			triggerShutdown()
+		} else {
+			timeLeft -= time.Second
+		}
+	}
+}
+
+func triggerShutdown() {
+	if runtime.GOOS == "windows" {
+		if err := exec.Command("cmd", "/C", "shutdown", "-s", "-f", "-t", "00").Run(); err != nil {
+			fmt.Println("Failed to initiate shutdown:", err)
+			log.Fatal(err)
+		}
+	}
+	if runtime.GOOS == "linux" {
+		if err := exec.Command("bash", "-c", "shutdown", "now").Run(); err != nil {
+			fmt.Println("Failed to initiate shutdown:", err)
+			log.Fatal(err)
+		}
+	}
 }
 
 var timeLeft time.Duration
-var timeEnd time.Time
 var wTimeCurrent, wTimeLeft, wTimeEnd *widget.Label
+var bStart, bStop *widget.Button
+var runs bool
 
 func main() {
 	app := app.New()
@@ -49,10 +80,9 @@ func main() {
 	)
 
 	// dummyStart
-	timeLeft = 120
-	timeEnd = time.Now().Add(timeLeft * time.Second)
+	timeLeft = 10 * time.Second
 
-	printTime()
+	outputTime()
 
 	containerTop := fyne.NewContainerWithLayout(layout.NewCenterLayout())
 	containerTop.AddObject(widget.NewHBox(
@@ -75,10 +105,23 @@ func main() {
 		}),
 	))
 
+	bStart = widget.NewButton("START", func() {
+		runs = true
+		bStart.Disable()
+		bStop.Enable()
+	})
+	bStop = widget.NewButton("STOP", func() {
+		runs = false
+		bStart.Enable()
+		bStop.Disable()
+	})
+	runs = false
+	bStop.Disable()
+
 	containerBottom := fyne.NewContainerWithLayout(layout.NewCenterLayout())
 	containerBottom.AddObject(widget.NewHBox(
-		widget.NewButton("START", func() {}),
-		widget.NewButton("STOP", func() {}),
+		bStart,
+		bStop,
 	))
 
 	containerMaster := fyne.NewContainerWithLayout(layout.NewBorderLayout(containerTop, containerBottom, nil, nil))
@@ -96,7 +139,8 @@ func main() {
 	go func() {
 		t := time.NewTicker(time.Second)
 		for range t.C {
-			printTime()
+			updateTime()
+			outputTime()
 		}
 	}()
 
