@@ -5,6 +5,7 @@ import (
 	"log"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"time"
 
 	"fyne.io/fyne"
@@ -18,15 +19,15 @@ import (
 func outputTime() {
 	timeNow := time.Now()
 	timeFormatted := timeNow.Format("15:04:05")
-	wTimeCurrent.SetText(fmt.Sprintf("Uhrzeit:             %s", timeFormatted))
+	widTimeCurrent.SetText(fmt.Sprintf("Uhrzeit:             %s", timeFormatted))
 
 	timeLeftT := time.Time{}.Add(timeLeft)
 	timeFormatted = timeLeftT.Format("15:04:05")
-	wTimeLeft.SetText(fmt.Sprintf("verbleibend:   %s", timeFormatted))
+	widTimeLeft.SetText(fmt.Sprintf("verbleibend:   %s", timeFormatted))
 
 	timeEnd := timeNow.Add(timeLeft)
 	timeFormatted = timeEnd.Format("15:04:05")
-	wTimeEnd.SetText(fmt.Sprintf("Ende:                 %s", timeFormatted))
+	widTimeEnd.SetText(fmt.Sprintf("Ende:                 %s", timeFormatted))
 }
 
 func addTime(duration time.Duration) {
@@ -34,10 +35,23 @@ func addTime(duration time.Duration) {
 	outputTime()
 }
 
+func setTime() {
+	hour, err1 := strconv.Atoi(inTimeH.Text)
+	min, err2 := strconv.Atoi(inTimeM.Text)
+	if err1 != nil || err2 != nil {
+		inTimeH.SetText("00")
+		inTimeM.SetText("00")
+		return
+	}
+
+	timeLeft = time.Duration(hour)*time.Hour + time.Duration(min)*time.Minute
+	outputTime()
+}
+
 func updateTime() {
-	if runs {
+	if timerIsRunning {
 		if timeLeft <= 0 {
-			runs = false
+			timerIsRunning = false
 			triggerShutdown()
 		} else {
 			timeLeft -= time.Second
@@ -61,67 +75,86 @@ func triggerShutdown() {
 }
 
 var timeLeft time.Duration
-var wTimeCurrent, wTimeLeft, wTimeEnd *widget.Label
-var bStart, bStop *widget.Button
-var runs bool
+
+var widTimeCurrent, widTimeLeft, widTimeEnd *widget.Label
+var btnStart, btnStop, btnSet *widget.Button
+var inTimeH, inTimeM *widget.Entry
+
+var timerIsRunning bool
 
 func main() {
 	app := app.New()
 	window := app.NewWindow("Shutdown Timer")
 
-	wTimeCurrent = widget.NewLabelWithStyle("",
+	// dummyStart
+	timeLeft = 0
+
+	widTimeCurrent = widget.NewLabelWithStyle("",
 		fyne.TextAlignTrailing, fyne.TextStyle{Bold: false},
 	)
-	wTimeLeft = widget.NewLabelWithStyle("",
+	widTimeLeft = widget.NewLabelWithStyle("",
 		fyne.TextAlignTrailing, fyne.TextStyle{Bold: true},
 	)
-	wTimeEnd = widget.NewLabelWithStyle("",
+	widTimeEnd = widget.NewLabelWithStyle("",
 		fyne.TextAlignTrailing, fyne.TextStyle{Bold: false},
 	)
-
-	// dummyStart
-	timeLeft = 10 * time.Second
-
-	outputTime()
-
 	containerTop := fyne.NewContainerWithLayout(layout.NewCenterLayout())
 	containerTop.AddObject(widget.NewHBox(
 		widget.NewVBox(
-			wTimeCurrent,
-			wTimeLeft,
-			wTimeEnd,
+			widTimeCurrent,
+			widTimeLeft,
+			widTimeEnd,
 		),
 	))
+
+	inTimeH = widget.NewEntry()
+	inTimeH.SetText("00")
+	inTimeM = widget.NewEntry()
+	inTimeM.SetText("00")
+
+	btnSet = widget.NewButton("Zeit setzen", func() {
+		setTime()
+	})
+
 	containerCenter := fyne.NewContainerWithLayout(layout.NewCenterLayout())
-	containerCenter.AddObject(widget.NewHBox(
-		widget.NewButton("+5 min", func() {
-			addTime(5 * time.Minute)
-		}),
-		widget.NewButton("+10 min", func() {
-			addTime(10 * time.Minute)
-		}),
-		widget.NewButton("+30 min", func() {
-			addTime(30 * time.Minute)
-		}),
+	containerCenter.AddObject(widget.NewVBox(
+		widget.NewHBox(
+			widget.NewButton("+5 min", func() {
+				addTime(5 * time.Minute)
+			}),
+			widget.NewButton("+10 min", func() {
+				addTime(10 * time.Minute)
+			}),
+			widget.NewButton("+30 min", func() {
+				addTime(30 * time.Minute)
+			}),
+		),
+		widget.NewHBox(
+			inTimeH, widget.NewLabel("stunden"),
+			inTimeM, widget.NewLabel("minuten"),
+			btnSet,
+		),
 	))
 
-	bStart = widget.NewButton("START", func() {
-		runs = true
-		bStart.Disable()
-		bStop.Enable()
+	btnStart = widget.NewButton("START", func() {
+		if timeLeft > 0 {
+			timerIsRunning = true
+			btnStart.Disable()
+			btnStop.Enable()
+		}
 	})
-	bStop = widget.NewButton("STOP", func() {
-		runs = false
-		bStart.Enable()
-		bStop.Disable()
+	btnStop = widget.NewButton("STOP", func() {
+		timerIsRunning = false
+		btnStart.Enable()
+		btnStop.Disable()
 	})
-	runs = false
-	bStop.Disable()
+	timerIsRunning = false
+	btnStop.Disable()
 
 	containerBottom := fyne.NewContainerWithLayout(layout.NewCenterLayout())
 	containerBottom.AddObject(widget.NewHBox(
-		bStart,
-		bStop,
+		btnStart,
+		btnStop,
 	))
 
 	containerMaster := fyne.NewContainerWithLayout(layout.NewBorderLayout(containerTop, containerBottom, nil, nil))
@@ -133,7 +166,7 @@ func main() {
 
 	// settings for the window
 	window.SetIcon(img.Icon)
-	window.Resize(fyne.NewSize(400, 200))
+	window.Resize(fyne.NewSize(400, 150))
 	window.CenterOnScreen()
 
 	go func() {
@@ -144,5 +177,6 @@ func main() {
 		}
 	}()
 
+	outputTime()
 	window.ShowAndRun()
 }

@@ -4,4 +4,4 @@ fyne:	build
 	fyne package -icon .\img\icon.png
 	go build -ldflags -H=windowsgui
 images:
-	fyne bundle -package img -name icon .\img\icon.png > .\img\img.go
+	fyne bundle -package img -name Icon .\img\icon.png > .\img\img.go
